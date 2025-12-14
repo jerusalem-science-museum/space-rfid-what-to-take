@@ -1,0 +1,12 @@
+{
+  "rfid_mappings": {
+    "123": "pear.jpg",
+    "464": "pear.jpg",
+    "212": "apple.jpg",
+    "111": "apple.jpg",
+    "555": "pineapple.jpg",
+    "666": "pineapple.jpg"
+  },
+  "inactivity_timeout": 2,
+  "welcome_image": "welcome.jpg"
+}
