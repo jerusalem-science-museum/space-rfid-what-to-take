@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
 Main display program for RFID Image Display System.
-Displays images based on RFID tag input and shows welcome image after inactivity.
+Displays images and videos based on RFID tag input and shows welcome image after inactivity.
 """
 
 import json
 import os
+import threading
+import time
 import tkinter as tk
 from pathlib import Path
 from PIL import Image, ImageTk
+import cv2
 
 
 CONFIG_FILE = "config.json"
@@ -23,6 +26,10 @@ class RFIDImageDisplay:
         self.inactivity_timer = None
         self.running = True
         self.rfid_buffer = ""  # Buffer for RFID input characters
+        self.video_cap = None  # Video capture object
+        self.video_playing = False
+        self.video_thread = None
+        self.stop_video_flag = threading.Event()
         
         # Setup window
         self.setup_window()
@@ -65,12 +72,9 @@ class RFIDImageDisplay:
     
     def setup_window(self):
         """Setup the fullscreen display window."""
-        self.root.title("RFID Image Display")
+        self.root.title("RFID Media Display")
         self.root.attributes('-fullscreen', True)
         self.root.configure(bg='black')
-        
-        # Keep window decorations so it appears in taskbar and can be focused
-        # self.root.overrideredirect(True)  # Commented out to allow window focus
         
         # Bind Escape key to exit
         self.root.bind('<Escape>', lambda e: self.quit())
@@ -83,13 +87,135 @@ class RFIDImageDisplay:
         self.image_label = tk.Label(self.root, bg='black')
         self.image_label.pack(expand=True, fill='both')
     
-    def get_image_path(self, filename):
-        """Get full path to an image file."""
+    def get_media_path(self, filename):
+        """Get full path to a media file (image or video)."""
         return Path(IMAGES_DIR) / filename
+    
+    def is_video_file(self, filename):
+        """Check if file is a video based on extension."""
+        video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
+        return Path(filename).suffix.lower() in video_extensions
+    
+    def stop_video(self):
+        """Stop any currently playing video."""
+        if self.video_playing:
+            self.stop_video_flag.set()
+            self.video_playing = False
+            if self.video_cap is not None:
+                self.video_cap.release()
+                self.video_cap = None
+            if self.video_thread is not None:
+                self.video_thread.join(timeout=1.0)
+                self.video_thread = None
+    
+    def play_video(self, video_filename):
+        """Play a video file fullscreen."""
+        video_path = self.get_media_path(video_filename)
+        
+        if not video_path.exists():
+            print(f"Warning: Video not found: {video_path}")
+            return False
+        
+        # Stop any currently playing video
+        self.stop_video()
+        
+        try:
+            # Open video file
+            self.video_cap = cv2.VideoCapture(str(video_path))
+            
+            if not self.video_cap.isOpened():
+                print(f"Error: Could not open video {video_filename}")
+                return False
+            
+            # Get video properties
+            fps = self.video_cap.get(cv2.CAP_PROP_FPS)
+            if fps <= 0:
+                fps = 30  # Default FPS if not available
+            
+            self.video_playing = True
+            self.stop_video_flag.clear()
+            
+            # Start video playback in a separate thread
+            self.video_thread = threading.Thread(target=self._video_loop, args=(fps,), daemon=True)
+            self.video_thread.start()
+            
+            return True
+        except Exception as e:
+            print(f"Error loading video {video_filename}: {e}")
+            self.stop_video()
+            return False
+    
+    def _video_loop(self, fps):
+        """Video playback loop running in a separate thread."""
+        frame_delay = int(1000 / fps) if fps > 0 else 33  # milliseconds per frame
+        
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        while self.video_playing and not self.stop_video_flag.is_set():
+            ret, frame = self.video_cap.read()
+            
+            if not ret:
+                # Video ended, go back to welcome image
+                self.video_playing = False
+                self.root.after(0, self._on_video_finished)
+                break
+            
+            # Resize frame to fit screen while maintaining aspect ratio
+            frame_height, frame_width = frame.shape[:2]
+            scale_w = screen_width / frame_width
+            scale_h = screen_height / frame_height
+            scale = min(scale_w, scale_h)
+            
+            new_width = int(frame_width * scale)
+            new_height = int(frame_height * scale)
+            
+            frame_resized = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_LANCZOS4)
+            
+            # Convert BGR to RGB for tkinter
+            frame_rgb = cv2.cvtColor(frame_resized, cv2.COLOR_BGR2RGB)
+            
+            # Convert to PIL Image
+            pil_image = Image.fromarray(frame_rgb)
+            
+            # Convert to PhotoImage and update on main thread
+            self.root.after(0, self._update_video_frame, pil_image)
+            
+            # Wait for next frame
+            time.sleep(frame_delay / 1000.0)
+        
+        # Cleanup
+        if self.video_cap is not None:
+            self.video_cap.release()
+            self.video_cap = None
+    
+    def _on_video_finished(self):
+        """Handle video playback completion - return to welcome image."""
+        self.stop_video()
+        self.display_welcome_image()
+        self.reset_inactivity_timer()
+    
+    def _update_video_frame(self, pil_image):
+        """Update video frame on main thread."""
+        if not self.video_playing:
+            return
+        
+        try:
+            # Convert to PhotoImage
+            photo = ImageTk.PhotoImage(pil_image)
+            
+            # Update label
+            self.image_label.config(image=photo)
+            self.image_label.image = photo  # Keep a reference
+        except Exception as e:
+            print(f"Error updating video frame: {e}")
     
     def load_and_display_image(self, image_filename):
         """Load and display an image fullscreen."""
-        image_path = self.get_image_path(image_filename)
+        # Stop any playing video first
+        self.stop_video()
+        
+        image_path = self.get_media_path(image_filename)
         
         if not image_path.exists():
             print(f"Warning: Image not found: {image_path}")
@@ -126,8 +252,18 @@ class RFIDImageDisplay:
             print(f"Error loading image {image_filename}: {e}")
             return False
     
+    def load_and_display_media(self, media_filename):
+        """Load and display an image or video file."""
+        if self.is_video_file(media_filename):
+            return self.play_video(media_filename)
+        else:
+            return self.load_and_display_image(media_filename)
+    
     def display_welcome_image(self):
         """Display the welcome image."""
+        # Stop any playing video first
+        self.stop_video()
+        
         welcome_image = self.config.get("welcome_image", "welcome.jpg")
         if not self.load_and_display_image(welcome_image):
             # If welcome image not found, show a default message
@@ -139,16 +275,21 @@ class RFIDImageDisplay:
                 justify='center'
             )
     
-    def display_rfid_image(self, rfid_code):
-        """Display image corresponding to RFID code."""
+    def display_rfid_media(self, rfid_code):
+        """Display image or video corresponding to RFID code."""
         mappings = self.config.get("rfid_mappings", {})
         
         if rfid_code in mappings:
-            image_filename = mappings[rfid_code]
-            if self.load_and_display_image(image_filename):
-                print(f"Displayed image for RFID {rfid_code}: {image_filename}")
+            media_filename = mappings[rfid_code]
+            if self.load_and_display_media(media_filename):
+                media_type = "video" if self.is_video_file(media_filename) else "image"
+                print(f"Displayed {media_type} for RFID {rfid_code}: {media_filename}")
+                # Only reset inactivity timer for images, not videos
+                # Videos will reset it when they finish
+                if not self.is_video_file(media_filename):
+                    self.reset_inactivity_timer()
             else:
-                print(f"Failed to load image for RFID {rfid_code}: {image_filename}")
+                print(f"Failed to load media for RFID {rfid_code}: {media_filename}")
                 self.display_welcome_image()
         else:
             print(f"RFID code {rfid_code} not found in mappings")
@@ -159,6 +300,11 @@ class RFIDImageDisplay:
         # Cancel existing timer if any
         if self.inactivity_timer:
             self.root.after_cancel(self.inactivity_timer)
+            self.inactivity_timer = None
+        
+        # Don't set inactivity timer if video is playing
+        if self.video_playing:
+            return
         
         # Get timeout from config
         timeout_seconds = self.config.get("inactivity_timeout", 30) * 1000  # Convert to milliseconds
@@ -166,15 +312,20 @@ class RFIDImageDisplay:
         # Schedule welcome image display
         self.inactivity_timer = self.root.after(
             timeout_seconds,
-            self.display_welcome_image
+            self._on_inactivity_timeout
         )
+    
+    def _on_inactivity_timeout(self):
+        """Handle inactivity timeout - only if not playing video."""
+        if not self.video_playing:
+            self.display_welcome_image()
     
     def _process_rfid_input(self, rfid_code):
         """Process RFID input on main thread."""
         rfid_code = rfid_code.strip()
         if rfid_code:
             print(f"Received RFID code: {rfid_code}")
-            self.display_rfid_image(rfid_code)
+            self.display_rfid_media(rfid_code)
             self.reset_inactivity_timer()
     
     def setup_rfid_capture(self):
@@ -207,6 +358,8 @@ class RFIDImageDisplay:
     def quit(self):
         """Quit the application."""
         self.running = False
+        # Stop any playing video
+        self.stop_video()
         # The RFID thread is a daemon thread, so it will exit automatically
         self.root.quit()
         self.root.destroy()

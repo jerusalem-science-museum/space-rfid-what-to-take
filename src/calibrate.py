@@ -48,31 +48,32 @@ def save_config(config):
         print(f"Error saving config: {e}")
 
 
-def get_image_files():
-    """Get list of image files from data/images directory."""
+def get_media_files():
+    """Get list of image and video files from data/images directory."""
     images_dir = Path(IMAGES_DIR)
     if not images_dir.exists():
         return []
     
     image_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.bmp'}
-    image_files = []
+    video_extensions = {'.mp4', '.avi', '.mov', '.mkv', '.wmv', '.flv', '.webm'}
+    media_files = []
     
     for file in images_dir.iterdir():
-        if file.is_file() and file.suffix.lower() in image_extensions:
-            image_files.append(file.name)
+        if file.is_file() and file.suffix.lower() in (image_extensions | video_extensions):
+            media_files.append(file.name)
     
-    return sorted(image_files)
+    return sorted(media_files)
 
 
 def show_image_selection_dialog(rfid_code):
-    """Show a dialog to select an image for the given RFID code."""
-    image_files = get_image_files()
+    """Show a dialog to select an image or video for the given RFID code."""
+    media_files = get_media_files()
     
-    if not image_files:
+    if not media_files:
         messagebox.showerror(
-            "No Images Found",
-            f"No image files found in {IMAGES_DIR}.\n"
-            "Please add image files to the directory first."
+            "No Media Files Found",
+            f"No image or video files found in {IMAGES_DIR}.\n"
+            "Please add image or video files to the directory first."
         )
         return None
     
@@ -90,21 +91,22 @@ def show_image_selection_dialog(rfid_code):
     dialog.geometry(f"+{x}+{y}")
     
     # Ensure dialog stays focused (since there's no mouse)
-    # dialog.focus_force()
+    dialog.focus_force()
+    dialog.lift()  # Bring dialog to front
     
     selected_image = [None]  # Use list to allow modification in nested function
     
     # Label
     label = tk.Label(
         dialog,
-        text=f"Select image for RFID code: {rfid_code}",
+        text=f"Select image or video for RFID code: {rfid_code}",
         font=("Arial", 10)
     )
     label.pack(pady=10)
     
     # Combobox
     combo_var = tk.StringVar()
-    combo = ttk.Combobox(dialog, textvariable=combo_var, values=image_files, width=40)
+    combo = ttk.Combobox(dialog, textvariable=combo_var, values=media_files, width=40)
     combo.pack(pady=5)
     combo.current(0)  # Select first item by default
     
@@ -118,7 +120,7 @@ def show_image_selection_dialog(rfid_code):
             selected_image[0] = selected
             dialog.destroy()
         else:
-            messagebox.showwarning("No Selection", "Please select an image.")
+            messagebox.showwarning("No Selection", "Please select an image or video.")
     
     def cancel():
         dialog.destroy()
@@ -151,22 +153,23 @@ def main():
     print("(Press Ctrl+C to exit)")
     print("=" * 50)
     
-    # Initialize tkinter root (hidden)
+    # Initialize tkinter root (minimized so it appears in taskbar but doesn't take space)
     root = tk.Tk()
-    root.withdraw()
+    root.title("RFID Calibration Tool")
+    root.iconify()  # Minimize instead of hiding completely
     
     config = load_config()
-    image_files = get_image_files()
+    media_files = get_media_files()
     
-    if not image_files:
-        print(f"\nERROR: No image files found in {IMAGES_DIR}")
-        print("Please add image files to the directory first.")
+    if not media_files:
+        print(f"\nERROR: No image or video files found in {IMAGES_DIR}")
+        print("Please add image or video files to the directory first.")
         return
     
-    print(f"\nFound {len(image_files)} image(s) in {IMAGES_DIR}")
+    print(f"\nFound {len(media_files)} media file(s) in {IMAGES_DIR}")
     print("\nInstructions:")
     print("1. Place an RFID tag near the reader")
-    print("2. Select the corresponding image from the dropdown")
+    print("2. Select the corresponding image or video from the dropdown")
     print("3. Click 'Save Mapping'")
     print("4. Repeat for all RFID tags\n")
     
@@ -205,7 +208,7 @@ def main():
                 save_config(config)
                 print(f"✓ Mapped {rfid_code} -> {selected_image}")
             else:
-                print("✗ Mapping cancelled or no image selected")
+                print("✗ Mapping cancelled or no media file selected")
     
     except KeyboardInterrupt:
         print("\n\nCalibration stopped by user.")
