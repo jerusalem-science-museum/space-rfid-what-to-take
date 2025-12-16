@@ -89,6 +89,9 @@ def show_image_selection_dialog(rfid_code):
     y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
     dialog.geometry(f"+{x}+{y}")
     
+    # Ensure dialog stays focused (since there's no mouse)
+    # dialog.focus_force()
+    
     selected_image = [None]  # Use list to allow modification in nested function
     
     # Label
@@ -215,4 +218,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+    # res = input("put in rfid: ")
+    # print(res)
 

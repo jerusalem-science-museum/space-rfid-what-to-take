@@ -6,11 +6,9 @@ Displays images based on RFID tag input and shows welcome image after inactivity
 
 import json
 import os
-import threading
 import tkinter as tk
 from pathlib import Path
 from PIL import Image, ImageTk
-from pynput import keyboard
 
 
 CONFIG_FILE = "config.json"
@@ -23,12 +21,14 @@ class RFIDImageDisplay:
         self.config = self.load_config()
         self.current_image = None
         self.inactivity_timer = None
-        self.rfid_thread = None
         self.running = True
         self.rfid_buffer = ""  # Buffer for RFID input characters
         
         # Setup window
         self.setup_window()
+        
+        # Ensure window stays focused (since there's no mouse)
+        self.root.focus_force()
         
         # Load and display welcome image initially
         self.display_welcome_image()
@@ -36,7 +36,7 @@ class RFIDImageDisplay:
         # Start inactivity timer
         self.reset_inactivity_timer()
         
-        # Start RFID input capture using pynput (works globally)
+        # Start RFID input capture using stdin in a separate thread
         self.setup_rfid_capture()
     
     def load_config(self):
@@ -74,6 +74,10 @@ class RFIDImageDisplay:
         
         # Bind Escape key to exit
         self.root.bind('<Escape>', lambda e: self.quit())
+        
+        # Bind keyboard events for RFID input capture
+        # Capture all keypresses to build RFID code
+        self.root.bind('<KeyPress>', self.on_key_press)
         
         # Create label for displaying images
         self.image_label = tk.Label(self.root, bg='black')
@@ -174,45 +178,36 @@ class RFIDImageDisplay:
             self.reset_inactivity_timer()
     
     def setup_rfid_capture(self):
-        """Setup RFID input capture using pynput (works globally, regardless of window focus)."""
+        """Setup RFID input capture - using tkinter keyboard events."""
         print("RFID capture active. Waiting for tags...")
-        
-        # Start pynput keyboard listener in background thread
-        self.keyboard_listener = keyboard.Listener(
-            on_press=self.on_key_press_pynput,
-            suppress=False  # Don't suppress the key events (let them pass through)
-        )
-        self.keyboard_listener.start()
+        # Keyboard events are handled by on_key_press() binding
     
-    def on_key_press_pynput(self, key):
-        """Handle key press events from pynput to build RFID code buffer."""
+    def on_key_press(self, event):
+        """Handle key press events to build RFID code."""
         try:
-            # Handle Enter key
-            if key == keyboard.Key.enter:
+            # Handle Enter key - process the RFID code
+            if event.keysym == 'Return' or event.keysym == 'KP_Enter':
                 if self.rfid_buffer:
                     rfid_code = self.rfid_buffer.strip()
                     self.rfid_buffer = ""  # Reset buffer
-                    # Schedule UI update on main thread
-                    self.root.after(0, lambda code=rfid_code: self._process_rfid_input(code))
+                    self._process_rfid_input(rfid_code)
                 return
             
             # Handle Escape key to exit
-            if key == keyboard.Key.esc:
-                self.root.after(0, self.quit)
+            if event.keysym == 'Escape':
+                self.quit()
                 return
             
-            # Handle character keys
-            if hasattr(key, 'char') and key.char and key.char.isprintable():
-                self.rfid_buffer += key.char
+            # Handle character keys - add to buffer
+            if event.char and event.char.isprintable():
+                self.rfid_buffer += event.char
         except Exception as e:
             print(f"Error handling key press: {e}")
     
     def quit(self):
         """Quit the application."""
         self.running = False
-        # Stop keyboard listener
-        if hasattr(self, 'keyboard_listener') and self.keyboard_listener:
-            self.keyboard_listener.stop()
+        # The RFID thread is a daemon thread, so it will exit automatically
         self.root.quit()
         self.root.destroy()
     
