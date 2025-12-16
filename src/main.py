@@ -69,8 +69,8 @@ class RFIDImageDisplay:
         self.root.attributes('-fullscreen', True)
         self.root.configure(bg='black')
         
-        # Remove window decorations
-        self.root.overrideredirect(True)
+        # Keep window decorations so it appears in taskbar and can be focused
+        # self.root.overrideredirect(True)  # Commented out to allow window focus
         
         # Bind Escape key to exit
         self.root.bind('<Escape>', lambda e: self.quit())
