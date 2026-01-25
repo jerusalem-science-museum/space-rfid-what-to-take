@@ -1,6 +1,7 @@
 import vlc
 from pathlib import PurePath, Path
 import json
+import threading
 
 class VideoPlayer:
     """
@@ -23,24 +24,9 @@ class VideoPlayer:
         self.playlist_player.set_media_player(self.player)
         self.config = json.load(open('config.json','r'))
         self.welcome_video_media = self.instance.media_new(self._get_video_path('welcome_video'))
+        self.welcome_video_media.add_option("input-repeat=-1")
         self.play_welcome()
     
-    def _on_end(self, event):
-        """
-        since our playlist contains the video + welcome screen, 
-        when we start a new media (i.e. the welcome screen), we want the playlist to repeat it infinitly.
-        """
-        self.playlist_player.set_playback_mode(vlc.PlaybackMode.repeat)
-
-
-    def set_on_end(self,):
-        """
-        setup callback for end of first video in playlist.
-        """
-        event_manager = self.player.event_manager()
-        self._end_callback = lambda event: self._on_end(event)
-        event_manager.event_attach(vlc.EventType.MediaPlayerMediaChanged , self._end_callback)
-
     def shutdown_vlc(self):
         """
         gracefully exit vlc.
@@ -64,33 +50,30 @@ class VideoPlayer:
             return
         
         media_path = self._get_video_path(puck_code)
+        print("play_video called with:", puck_code, "filename: ", media_path)
         media = self.instance.media_new(media_path)
         self.player.set_media(media)
         self.player.play()
-        #playlist = self.instance.media_list_new()
-        #playlist.add_media(media)
-        #playlist.add_media(self.welcome_video_media)
-        #self.playlist_player.set_media_list(playlist)
-        #self.playlist_player.play_item_at_index(0)
+        print("after play(): state=", self.player.get_state(), "is_playing=", self.player.is_playing())
 
+        
         def on_first_end(event):
-            # Switch to welcome and loop it via event
-            welcome_path = self._get_video_path("welcome_video")
-            def loop_welcome(event):
-                welcome_media = self.instance.media_new(welcome_path)
-                self.player.set_media(welcome_media)
-                self.player.play()
-            mgr = self.player.event_manager()
-            mgr.event_detach(vlc.EventType.MediaPlayerEndReached)  # Clear prior
-            mgr.event_attach(vlc.EventType.MediaPlayerEndReached, loop_welcome)
-            # Trigger first welcome play
-            welcome_media = self.instance.media_new(welcome_path)
-            self.player.set_media(welcome_media)
-            self.player.play()
-
+                print("on_first_end fired. state=", self.player.get_state())
+                threading.Timer(0.05, self._play_welcome_loop).start()
+        # keep callback reference to avoid GC
+        self._end_callback = on_first_end
         mgr = self.player.event_manager()
-        mgr.event_attach(vlc.EventType.MediaPlayerEndReached, on_first_end)
+        mgr.event_detach(vlc.EventType.MediaPlayerEndReached)
+        mgr.event_attach(vlc.EventType.MediaPlayerEndReached, self._end_callback)
+        print("attached EndReached handler")
 
+    def _play_welcome_loop(self):
+        welcome_path = self._get_video_path("welcome_video")
+        welcome_media = self.instance.media_new(welcome_path)
+        welcome_media.add_option("input-repeat=-1")  # loop welcome inside VLC
+        self.player.set_media(welcome_media)
+        self.player.play()
+        print("welcome loop started")
 
     def save_dict(self):
         with open('config.json','w') as f:
