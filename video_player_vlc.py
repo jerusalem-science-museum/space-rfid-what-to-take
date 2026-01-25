@@ -65,11 +65,32 @@ class VideoPlayer:
         
         media_path = self._get_video_path(puck_code)
         media = self.instance.media_new(media_path)
-        playlist = self.instance.media_list_new()
-        playlist.add_media(media)
-        playlist.add_media(self.welcome_video_media)
-        self.playlist_player.set_media_list(playlist)
-        self.playlist_player.play_item_at_index(0)
+        self.player.set_media(media)
+        self.player.play()
+        #playlist = self.instance.media_list_new()
+        #playlist.add_media(media)
+        #playlist.add_media(self.welcome_video_media)
+        #self.playlist_player.set_media_list(playlist)
+        #self.playlist_player.play_item_at_index(0)
+
+        def on_first_end(event):
+            # Switch to welcome and loop it via event
+            welcome_path = self._get_video_path("welcome_video")
+            def loop_welcome(event):
+                welcome_media = self.instance.media_new(welcome_path)
+                self.player.set_media(welcome_media)
+                self.player.play()
+            mgr = self.player.event_manager()
+            mgr.event_detach(vlc.EventType.MediaPlayerEndReached)  # Clear prior
+            mgr.event_attach(vlc.EventType.MediaPlayerEndReached, loop_welcome)
+            # Trigger first welcome play
+            welcome_media = self.instance.media_new(welcome_path)
+            self.player.set_media(welcome_media)
+            self.player.play()
+
+        mgr = self.player.event_manager()
+        mgr.event_attach(vlc.EventType.MediaPlayerEndReached, on_first_end)
+
 
     def save_dict(self):
         with open('config.json','w') as f:
