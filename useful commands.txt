@@ -1,0 +1,24 @@
+ffmpeg boomerang video:
+
+ffmpeg -i input.mp4 -filter_complex "[0:v]reverse[r];[0:v][r]concat=n=2:v=1:a=0[outv]" -map "[outv]" output.mp4
+
+tailscale accept files:
+
+tailscale file get .
+
+autorun file in rpi 3b w option to remotely attach:
+# Auto-start/attach kiosk tmux session for app
+inside ~/.bashrc: 
+
+if [[ $- == *i* ]] && [[ -z "$TMUX" ]]; then
+  tmux new-session -Ad -s kiosk "/home/mada/Documents/space-rfid-what-to-take/run.sh"
+  tmux attach-session -t kiosk
+  exit
+fi
+
+
+mount dok:
+lsblk to see where the device is located then
+sudo mkdir -p /mnt/usb
+sudo mount /dev/sda1 /mnt/usb
+sudo umount /mnt/usb
