@@ -23,7 +23,7 @@ Each physical puck has two scannable sides, so two RFID codes map to the same vi
 ```bash
 git clone <repo-url>
 cd <repo-folder>
-chmod +x setup.sh && sudo ./setup.sh
+chmod +x setup.sh && ./setup.sh
 ```
 
 The script installs system packages (Python, VLC, tmux), AnyDesk for remote access, creates the Python virtual environment, configures desktop auto-login, and registers the app to launch on boot.
@@ -32,7 +32,7 @@ After setup:
 1. Set an AnyDesk unattended access password (open AnyDesk GUI → Security)
 2. Reboot: `sudo reboot`
 
-> **Note:** Video assets are not included in the repo (~2.2 GB). Copy the `data/` folder manually to the Pi before running.
+> **Note:** Video assets are not included in the repo (~2.2 GB). Copy the `data/` folder manually to the Pi before running. videos located [here](https://madaorgil-my.sharepoint.com/:f:/g/personal/ariels_mada_org_il/IgCJxbOUHLhDS7f8qEWn9AwRAbty9A36By976UAfQD9xBAA?e=dSQ1Dr)
 
 ## Development Setup
 
