@@ -21,8 +21,8 @@ Each physical puck has two scannable sides, so two RFID codes map to the same vi
 ## Fresh Raspberry Pi Setup
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
+git clone https://github.com/jerusalem-science-museum/space-rfid-what-to-take.git
+cd space-rfid-what-to-take
 chmod +x setup.sh && ./setup.sh
 ```
 
