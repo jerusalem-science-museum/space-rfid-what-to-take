@@ -1,7 +1,6 @@
 {
     "metadata": {
-        "data_folder": "data",
-        "inactivity_timeout": 2
+        "data_folder": "data"
     },
     "welcome_video": "welcome.mp4",
     "4294956014": "03-Velcro roll.mp4",
