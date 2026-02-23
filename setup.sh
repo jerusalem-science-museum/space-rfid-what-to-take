@@ -29,6 +29,22 @@ echo " Raspberry Pi Project Setup"
 echo " Repo: $REPO_DIR"
 echo "============================================="
 
+# --- 0. Sudo + AnyDesk password prompt ----------------------------------------
+# Refresh sudo credentials up-front so later sudo calls don't re-prompt.
+sudo -v
+
+# If AnyDesk is not yet installed, ask for the unattended-access password now
+# so the rest of the script can run unattended.
+ANYDESK_PWD=""
+if ! command -v anydesk &>/dev/null; then
+    echo ""
+    read -rsp "Enter password to set for AnyDesk unattended access: " ANYDESK_PWD
+    echo ""
+    if [ -z "$ANYDESK_PWD" ]; then
+        echo "  ⚠️  No password provided — AnyDesk password will NOT be set automatically."
+    fi
+fi
+
 # --- 1. System packages -------------------------------------------------------
 echo ""
 echo "[1/4] Installing system packages..."
@@ -65,9 +81,14 @@ else
     sudo systemctl start anydesk
 
     echo "  ✓ AnyDesk installed and service enabled"
-    echo ""
-    echo "  ⚠️  Remember to set an unattended access password in AnyDesk settings"
-    echo "     so you can connect without someone physically accepting the request."
+
+    # Set unattended access password if one was provided at the start
+    if [ -n "$ANYDESK_PWD" ]; then
+        echo "$ANYDESK_PWD" | sudo anydesk --set-password
+        echo "  ✓ AnyDesk unattended access password set"
+    else
+        echo "  ⚠️  No password was provided — set one manually in AnyDesk settings"
+    fi
 fi
 
 # --- 3. Python venv + dependencies --------------------------------------------
@@ -124,8 +145,7 @@ echo "============================================="
 echo " Setup complete!"
 echo ""
 echo " Next steps:"
-echo "   1. Set AnyDesk unattended access password (open anydesk GUI)"
-echo "   2. Make sure VLC uses hardware decoding in run.sh for smooth 1080p:"
+echo "   1. Make sure VLC uses hardware decoding in run.sh for smooth 1080p:"
 echo "      cvlc --codec=mmal <your_file>"
-echo "   3. Reboot to apply autologin + autostart: sudo reboot"
+echo "   2. Reboot to apply autologin + autostart: sudo reboot"
 echo "============================================="
