@@ -109,9 +109,12 @@ if ! grep -qF "$MARKER" "$BASHRC"; then
     cat >> "$BASHRC" << EOF
 
 $MARKER
-# Launch the app in a tmux session on login (only on tty1, only if not already running)
+# On physical console (tty1): start the kiosk session if not already running
 if [ "\$(tty)" = "/dev/tty1" ] && ! tmux has-session -t kiosk 2>/dev/null; then
     tmux new-session -d -s kiosk "$REPO_DIR/run.sh"
+    tmux attach-session -t kiosk
+# On SSH: auto-attach to the running kiosk session
+elif [ -n "\$SSH_CONNECTION" ] && tmux has-session -t kiosk 2>/dev/null; then
     tmux attach-session -t kiosk
 fi
 # <<< kiosk autostart <<<
