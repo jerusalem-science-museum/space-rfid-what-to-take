@@ -69,7 +69,7 @@ Maps RFID codes to video filenames. Edit this file to change mappings or add new
 
 ```json
 {
-    "metadata": { "data_folder": "data"},
+    "metadata": { "data_folder": "data" },
     "welcome_video": "welcome.mp4",
     "751": "05-Tortilla.mp4",
     "4294956014": "03-Velcro roll.mp4"

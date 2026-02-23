@@ -9,8 +9,8 @@
 #   chmod +x setup.sh && ./setup.sh
 #
 # Notes:
-#   - AnyDesk supports Pi 2/3/4/400 only (not Pi 5)
-#   - AnyDesk requires a desktop environment (Xorg) for incoming connections
+#   - Boots to console (no desktop) for best VLC performance via DRM
+#   - Tailscale provides SSH access from anywhere
 #   - For 1080p VLC on Pi 3B: always use --codec=mmal or --codec=v4l2 to enable
 #     hardware decoding, otherwise the CPU will struggle
 # =============================================================================
@@ -29,6 +29,10 @@ echo " Raspberry Pi Project Setup"
 echo " Repo: $REPO_DIR"
 echo "============================================="
 
+# --- 0. Sudo -----------------------------------------------------------------
+# Refresh sudo credentials up-front so later sudo calls don't re-prompt.
+# sudo -v
+
 # --- 1. System packages -------------------------------------------------------
 echo ""
 echo "[1/4] Installing system packages..."
@@ -40,42 +44,38 @@ sudo apt-get install -y \
     python3-pip \
     tmux \
     vlc
-    # Add any other apt packages your project needs, e.g.:
-    # libgpiod2
-    # i2c-tools
-    # ffmpeg
 
 echo "  ✓ System packages installed"
 
-# --- 2. AnyDesk ---------------------------------------------------------------
+# --- 2. Tailscale -------------------------------------------------------------
 echo ""
-echo "[2/4] Installing AnyDesk..."
+echo "[2/4] Installing Tailscale..."
 
-if command -v anydesk &>/dev/null; then
-    echo "  AnyDesk already installed, skipping"
+if command -v tailscale &>/dev/null; then
+    echo "  Tailscale already installed, skipping"
 else
-    sudo apt-get install -y wget gnupg
-    sudo mkdir -p /etc/apt/keyrings
-    wget -qO - https://keys.anydesk.com/repos/DEB-GPG-KEY | sudo gpg --dearmor -o /etc/apt/keyrings/anydesk.gpg
-    echo "deb [signed-by=/etc/apt/keyrings/anydesk.gpg] http://deb.anydesk.com/ all main" | sudo tee /etc/apt/sources.list.d/anydesk-stable.list
-    sudo apt-get update -y
-    sudo apt-get install -y anydesk
-
-    sudo systemctl enable anydesk
-    sudo systemctl start anydesk
-
-    echo "  ✓ AnyDesk installed and service enabled"
-    echo ""
-    echo "  ⚠️  Remember to set an unattended access password in AnyDesk settings"
-    echo "     so you can connect without someone physically accepting the request."
+    curl -fsSL https://tailscale.com/install.sh | sh
+    sudo systemctl enable tailscaled
+    sudo systemctl start tailscaled
+    echo "  ✓ Tailscale installed and service enabled"
 fi
+
+# Bring Tailscale up with SSH enabled (will prompt for auth on first run)
+sudo tailscale up --ssh
+echo "  ✓ Tailscale is up (SSH enabled)"
 
 # --- 3. Python venv + dependencies --------------------------------------------
 echo ""
 echo "[3/4] Setting up Python virtual environment..."
 
-python3 -m venv "$VENV_DIR"
-"$VENV_DIR/bin/pip" install --upgrade pip
+if [ -d "$VENV_DIR" ]; then
+    echo "  Venv already exists, skipping creation"
+else
+    python3 -m venv "$VENV_DIR"
+    echo "  ✓ Venv created"
+fi
+
+"$VENV_DIR/bin/pip" install --upgrade pip --quiet
 
 if [ -f "$REPO_DIR/requirements.txt" ]; then
     "$VENV_DIR/bin/pip" install -r "$REPO_DIR/requirements.txt"
@@ -86,29 +86,13 @@ fi
 
 echo "  ✓ Venv ready at $VENV_DIR"
 
-# --- 4. GUI auto-login + autostart app ----------------------------------------
+# --- 4. Console auto-login + autostart via tmux ------------------------------
 echo ""
-echo "[4/4] Configuring GUI auto-login and app autostart..."
+echo "[4/4] Configuring console auto-login and app autostart..."
 
-# Boot to desktop GUI with auto-login (B4 = desktop autologin)
-# Required so the .desktop autostart entry below actually fires on boot.
-sudo raspi-config nonint do_boot_behaviour B4
-
-# Create autostart directory if it doesn't exist
-AUTOSTART_DIR="$HOME_DIR/.config/autostart"
-mkdir -p "$AUTOSTART_DIR"
-
-# Drop a .desktop entry to launch run.sh when the desktop session starts
-AUTOSTART_FILE="$AUTOSTART_DIR/kiosk.desktop"
-cat > "$AUTOSTART_FILE" << EOF
-[Desktop Entry]
-Type=Application
-Name=Kiosk App
-Exec=lxterminal -e $REPO_DIR/run.sh
-X-GNOME-Autostart-enabled=true
-EOF
-
-echo "  ✓ Autostart entry created at $AUTOSTART_FILE"
+# Boot to console with auto-login (B2 = CLI autologin)
+# No desktop environment — VLC renders directly via DRM for best performance.
+sudo raspi-config nonint do_boot_behaviour B2
 
 # Ensure run.sh is executable
 if [ -f "$REPO_DIR/run.sh" ]; then
@@ -118,14 +102,33 @@ else
     echo "  ⚠️  No run.sh found — create one to define how your app starts"
 fi
 
+# Add tmux autostart to .bashrc
+BASHRC="$HOME_DIR/.bashrc"
+MARKER="# >>> kiosk autostart >>>"
+if ! grep -qF "$MARKER" "$BASHRC"; then
+    cat >> "$BASHRC" << EOF
+
+$MARKER
+if [ -z "\$TMUX" ]; then
+    tmux new-session -A -s kiosk "$REPO_DIR/run.sh"
+fi
+# <<< kiosk autostart <<<
+EOF
+    echo "  ✓ Autostart added to $BASHRC"
+else
+    echo "  Autostart already in $BASHRC, skipping"
+fi
+
 # --- Done ---------------------------------------------------------------------
 echo ""
 echo "============================================="
 echo " Setup complete!"
 echo ""
 echo " Next steps:"
-echo "   1. Set AnyDesk unattended access password (open anydesk GUI)"
-echo "   2. Make sure VLC uses hardware decoding in run.sh for smooth 1080p:"
-echo "      cvlc --codec=mmal <your_file>"
-echo "   3. Reboot to apply autologin + autostart: sudo reboot"
+echo "   1. If Tailscale prompted an auth URL above, open it in a browser"
+echo "      and log in to approve this device."
+echo "   2. Reboot to apply console autologin + autostart: sudo reboot"
+echo "   3. SSH in from anywhere via Tailscale: ssh $USER@$(hostname)"
+echo "   4. To access the running app: tmux attach -t kiosk"
+echo "   5. To detach without stopping: Ctrl+B then D"
 echo "============================================="
