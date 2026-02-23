@@ -124,7 +124,7 @@ if __name__=="__main__":
     v = VideoPlayer()
     try:
         while True:
-            res = v._read_line().strip().lower()
+            res = input().strip().lower()
             if res=='exit':
                 v.shutdown_vlc()
                 break
