@@ -68,8 +68,14 @@ echo "  ✓ Tailscale is up (SSH enabled)"
 echo ""
 echo "[3/4] Setting up Python virtual environment..."
 
-python3 -m venv "$VENV_DIR"
-"$VENV_DIR/bin/pip" install --upgrade pip
+if [ -d "$VENV_DIR" ]; then
+    echo "  Venv already exists, skipping creation"
+else
+    python3 -m venv "$VENV_DIR"
+    echo "  ✓ Venv created"
+fi
+
+"$VENV_DIR/bin/pip" install --upgrade pip --quiet
 
 if [ -f "$REPO_DIR/requirements.txt" ]; then
     "$VENV_DIR/bin/pip" install -r "$REPO_DIR/requirements.txt"
