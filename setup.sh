@@ -31,7 +31,7 @@ echo "============================================="
 
 # --- 0. Sudo -----------------------------------------------------------------
 # Refresh sudo credentials up-front so later sudo calls don't re-prompt.
-sudo -v
+# sudo -v
 
 # --- 1. System packages -------------------------------------------------------
 echo ""
@@ -102,45 +102,21 @@ else
     echo "  ⚠️  No run.sh found — create one to define how your app starts"
 fi
 
-# Install systemd service to start the kiosk in a tmux session on boot
-SERVICE_FILE="/etc/systemd/system/kiosk.service"
-sudo tee "$SERVICE_FILE" > /dev/null << EOF
-[Unit]
-Description=Kiosk video player
-After=network.target
-
-[Service]
-Type=forking
-User=$USER
-ExecStart=/usr/bin/tmux new-session -d -s kiosk "$REPO_DIR/run.sh"
-ExecStop=/usr/bin/tmux kill-session -t kiosk
-RemainAfterExit=yes
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-sudo systemctl daemon-reload
-sudo systemctl enable kiosk.service
-echo "  ✓ Kiosk systemd service installed and enabled"
-
-# On SSH: auto-attach to the running kiosk session
+# Add tmux autostart to .bashrc
 BASHRC="$HOME_DIR/.bashrc"
 MARKER="# >>> kiosk autostart >>>"
 if ! grep -qF "$MARKER" "$BASHRC"; then
     cat >> "$BASHRC" << EOF
 
 $MARKER
-# On SSH login: auto-attach to the running kiosk tmux session
-if [ -n "\$SSH_CONNECTION" ] && tmux has-session -t kiosk 2>/dev/null; then
-    tmux attach-session -t kiosk
+if [ -z "\$TMUX" ]; then
+    tmux new-session -A -s kiosk "$REPO_DIR/run.sh"
 fi
 # <<< kiosk autostart <<<
 EOF
-    echo "  ✓ SSH auto-attach added to $BASHRC"
+    echo "  ✓ Autostart added to $BASHRC"
 else
-    echo "  SSH auto-attach already in $BASHRC, skipping"
+    echo "  Autostart already in $BASHRC, skipping"
 fi
 
 # --- Done ---------------------------------------------------------------------
