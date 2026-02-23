@@ -21,8 +21,8 @@ Each physical puck has two scannable sides, so two RFID codes map to the same vi
 ## Fresh Raspberry Pi Setup
 
 ```bash
-git clone <repo-url>
-cd <repo-folder>
+git clone https://github.com/jerusalem-science-museum/space-rfid-what-to-take.git
+cd space-rfid-what-to-take
 chmod +x setup.sh && ./setup.sh
 ```
 
@@ -32,7 +32,7 @@ After setup:
 1. Set an AnyDesk unattended access password (open AnyDesk GUI → Security)
 2. Reboot: `sudo reboot`
 
-> **Note:** Video assets are not included in the repo (~2.2 GB). Copy the `data/` folder manually to the Pi before running. videos located [here](https://madaorgil-my.sharepoint.com/:f:/g/personal/ariels_mada_org_il/IgCJxbOUHLhDS7f8qEWn9AwRAbty9A36By976UAfQD9xBAA?e=dSQ1Dr)
+> **Note:** Video assets are not included in the repo (~2.2 GB). Copy the `data/` folder manually to the Pi before running. videos located [here](https://madaorgil-my.sharepoint.com/:f:/g/personal/ariels_mada_org_il/IgCJxbOUHLhDS7f8qEWn9AwRAbty9A36By976UAfQD9xBAA?e=UdKcoN)
 
 ## Development Setup
 
